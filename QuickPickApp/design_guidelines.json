@@ -1,0 +1,104 @@
+{
+  "project_name": "QuickPick",
+  "app_type": "hybrid_fullstack (Customer, Shopkeeper, Admin)",
+  "theme_preference": "adaptive",
+  "design_archetype": "Organic & Earthy paired with Soft Utility (Trust, Speed, Clarity)",
+  "typography": {
+    "primary_font": "Manrope",
+    "secondary_font": "Figtree",
+    "font_strategy": "Manrope for friendly, trustworthy retail headings. Figtree for highly legible, compact data (orders, OTPs, pricing, lists).",
+    "scale": {
+      "h1": "text-4xl tracking-tight font-black",
+      "h2": "text-2xl tracking-tight font-bold",
+      "h3": "text-xl font-bold",
+      "body": "text-base leading-relaxed",
+      "caption": "text-sm tracking-[0.2em] uppercase text-slate-500",
+      "otp_display": "text-5xl font-mono tracking-widest font-bold"
+    }
+  },
+  "colors": {
+    "brand_primary": "#10B981",
+    "brand_primary_dark": "#047857",
+    "brand_accent": "#EA580C",
+    "background_app": "#F8FAFC",
+    "surface_card": "#FFFFFF",
+    "text_primary": "#0F172A",
+    "text_secondary": "#64748B",
+    "status_colors": {
+      "submitted": "#3B82F6",
+      "packing": "#F59E0B",
+      "ready": "#10B981",
+      "out_of_stock": "#EF4444"
+    }
+  },
+  "visual_enhancers": {
+    "borders": "1px solid border-slate-200. Minimal ambient shadows (shadow-sm) for floating elements. Avoid heavy neumorphism.",
+    "border_radius": "rounded-2xl for main cards, rounded-full for interactive buttons/chips (thumb-friendly).",
+    "surfaces": "Solid white cards. Use semi-transparent blur (backdrop-blur-xl bg-white/80) ONLY for sticky bottom bars, NOT for headers overlapping critical text. Header must be solid white."
+  },
+  "grids_and_layouts": {
+    "mobile_first_spacing": "Use p-4 for screen edges, gap-4 for lists. Use p-6 for inner card padding.",
+    "navigation": "Bottom tab bar with 3-4 items max for mobile views. Fixed height, distinct active states.",
+    "bento_grid": "Admin dashboard uses responsive bento grid (grid-cols-1 md:grid-cols-3) with tight gaps (gap-4).",
+    "filters": "Single row horizontal scroll for category chips. Hide scrollbar using CSS."
+  },
+  "components": {
+    "buttons": "Pill-shaped (rounded-full), h-14 for high-touch mobile targets. Apply scale-95 on active state.",
+    "cards": "Shop cards: 16:9 image aspect ratio on top, solid white body below with title, distance badge, and rating.",
+    "order_timeline": "Vertical step indicator using SVG lines. Active step is primary green, pending steps are slate.",
+    "otp_input": "Massive 8-digit split blocks or giant mono-spaced text block for easy reading by shopkeeper at distance.",
+    "role_selector": "Large block buttons with an icon and description for Customer, Shopkeeper, Admin.",
+    "headers": "Sticky top headers MUST have solid backgrounds. Fully transparent headers over content are strictly forbidden."
+  },
+  "motion_and_interactions": {
+    "page_transitions": "Slide-in from right for new pages, mimicking native mobile feel.",
+    "button_press": "Framer motion tap scale down (0.95).",
+    "lists": "Staggered fade-up for shop lists and order history (0.05s delay per item)."
+  },
+  "accessibility": {
+    "contrast": "Text must meet 4.5:1 ratio. No light gray text on white backgrounds. Use deep slate (#334155) for secondary text.",
+    "touch_targets": "Minimum 48x48px for all clickable mobile elements.",
+    "data_testid": "Mandatory on all interactive elements (e.g., `data-testid='login-btn'`, `data-testid='order-status'`)."
+  },
+  "image_urls": {
+    "shop_grocery": [
+      {
+        "url": "https://images.pexels.com/photos/36317181/pexels-photo-36317181.jpeg",
+        "description": "Busy Indian grocery store with shopkeeper"
+      },
+      {
+        "url": "https://images.pexels.com/photos/12419503/pexels-photo-12419503.jpeg",
+        "description": "Spices and grocery shelf"
+      }
+    ],
+    "shop_bakery": [
+      {
+        "url": "https://images.pexels.com/photos/7405059/pexels-photo-7405059.jpeg",
+        "description": "Fresh bakery pastry display"
+      }
+    ],
+    "payment_pickup": [
+      {
+        "url": "https://images.pexels.com/photos/12935051/pexels-photo-12935051.jpeg",
+        "description": "Mobile QR payment at counter"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Build the application using React JS (.js/.jsx files) and Tailwind CSS. Do NOT use TypeScript (.tsx).",
+    "Construct a mobile-first responsive layout that simulates a native app in the browser.",
+    "Use Manrope for headings and Figtree for UI data/numbers. Maintain strict text size hierarchies.",
+    "Avoid Shadcn 'Card' wrappers for complex custom lists; use raw div + Tailwind for pixel-perfect retail layouts.",
+    "Build an interactive order tracking timeline component (Submitted -> Packing -> Ready -> Picked Up).",
+    "Integrate the generated Unsplash image URLs as realistic store thumbnails.",
+    "For the Shopkeeper dashboard, ensure the 'Mark Ready' and 'Scan OTP' actions are massive, easily tappable buttons."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not converge toward generic outputs. Use custom layered design elements with clear z-index.",
+    "Never apply universal transitions (e.g., transition: all). Add specific transitions for transform and colors.",
+    "Never use text-align: center globally in App.css.",
+    "Use 2-3x more spacing for empty states and sections to avoid a cramped feel.",
+    "Never use AI assistant emojis for icons. Use the lucide-react library.",
+    "Add hover and active micro-animations to all interactive elements."
+  ]
+}
