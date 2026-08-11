@@ -50,8 +50,14 @@ try:
 except ImportError:
     openai_client = None
 
-client = AsyncIOMotorClient(MONGO_URL)
+import time
+import json as _json
+from collections import defaultdict
+
+client = AsyncIOMotorClient(MONGO_URL, maxPoolSize=20)
 db = client[DB_NAME]
+
+REDIS_URL = os.environ.get("REDIS_URL", "")
 
 app = FastAPI(title="QuickPick API")
 api = APIRouter(prefix="/api")
@@ -59,6 +65,85 @@ bearer = HTTPBearer(auto_error=False)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("quickpick")
+
+# --- Redis cache (optional — falls back to in-memory if no REDIS_URL) -----
+_redis = None
+
+async def cache_get(key: str):
+    if _redis:
+        val = await _redis.get(key)
+        return _json.loads(val) if val else None
+    return _mem_cache.get(key, (None, 0))[0] if time.monotonic() < _mem_cache.get(key, (None, 0))[1] else None
+
+async def cache_set(key: str, value, ttl: int = 60):
+    if _redis:
+        await _redis.setex(key, ttl, _json.dumps(value, default=str))
+    else:
+        _mem_cache[key] = (value, time.monotonic() + ttl)
+
+async def cache_del(key: str):
+    if _redis:
+        await _redis.delete(key)
+    else:
+        _mem_cache.pop(key, None)
+
+async def cache_del_pattern(pattern: str):
+    """Delete all keys matching prefix (used to bust shop/catalog caches)."""
+    if _redis:
+        keys = await _redis.keys(pattern)
+        if keys:
+            await _redis.delete(*keys)
+    else:
+        prefix = pattern.replace("*", "")
+        for k in list(_mem_cache.keys()):
+            if k.startswith(prefix):
+                del _mem_cache[k]
+
+_mem_cache: dict[str, tuple] = {}
+
+# --- In-memory OTP rate limit (survives without Redis) --------------------
+_otp_attempts: dict[str, list[float]] = defaultdict(list)
+OTP_WINDOW_SEC = 60
+OTP_MAX_PER_WINDOW = 3
+
+def _check_otp_rate(phone: str) -> None:
+    now = time.monotonic()
+    recent = [t for t in _otp_attempts[phone] if now - t < OTP_WINDOW_SEC]
+    if len(recent) >= OTP_MAX_PER_WINDOW:
+        raise HTTPException(429, "Too many OTP requests. Wait a minute and try again.")
+    recent.append(now)
+    _otp_attempts[phone] = recent
+
+
+@app.on_event("startup")
+async def startup():
+    global _redis
+    # Connect Redis if configured
+    if REDIS_URL:
+        try:
+            import redis.asyncio as aioredis
+            _redis = aioredis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=3)
+            await _redis.ping()
+            log.info("Redis connected: %s", REDIS_URL.split("@")[-1])
+        except Exception as e:
+            log.warning("Redis unavailable (%s) — using in-memory cache", e)
+            _redis = None
+    else:
+        log.info("No REDIS_URL — using in-memory cache")
+
+    # Create MongoDB indexes
+    await db.users.create_index("phone", unique=True)
+    await db.users.create_index("id", unique=True)
+    await db.shops.create_index("id", unique=True)
+    await db.shops.create_index("owner_id")
+    await db.shops.create_index([("status", 1), ("lat", 1), ("lng", 1)])
+    await db.catalog_items.create_index([("shop_id", 1), ("name", 1)])
+    await db.catalog_items.create_index("id", unique=True)
+    await db.orders.create_index("id", unique=True)
+    await db.orders.create_index("customer_id")
+    await db.orders.create_index([("shop_id", 1), ("status", 1)])
+    await db.subscriptions.create_index("shopkeeper_id", unique=True)
+    log.info("MongoDB indexes ready")
 
 
 # --- Helpers --------------------------------------------------------------
@@ -94,6 +179,7 @@ def make_token(user: dict) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
 
+_user_cache: dict[str, tuple[dict, float]] = {}
 async def get_current_user(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
 ) -> dict:
@@ -105,9 +191,15 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
-    user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
+    uid = payload["sub"]
+    cache_key = f"user:{uid}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+    user = await db.users.find_one({"id": uid}, {"_id": 0})
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
+    await cache_set(cache_key, user, ttl=120)
     return user
 
 
@@ -297,6 +389,7 @@ class SubscribeIn(BaseModel):
 # --- Auth routes ----------------------------------------------------------
 @api.post("/auth/request-otp")
 async def request_otp(body: RequestOTPIn):
+    _check_otp_rate(body.phone)
     otp = "{:06d}".format(random.randint(0, 999999))
     now = utcnow().isoformat()
     existing = await db.users.find_one({"phone": body.phone}, {"_id": 0})
@@ -320,7 +413,8 @@ async def request_otp(body: RequestOTPIn):
             }},
         )
     log.info("MOCK OTP for %s = %s", body.phone, otp)
-    return {"ok": True, "mock_otp": otp, "message": "OTP generated (mock)"}
+    # TODO: replace mock_otp with real SMS (Twilio/MSG91) before public launch
+    return {"ok": True, "mock_otp": otp, "message": "OTP sent (demo mode)"}
 
 
 @api.post("/auth/verify-otp")
@@ -426,6 +520,14 @@ async def shops_nearby(
     category: str = Query(""),
     radius_km: float = Query(50.0),
 ):
+    # Cache approved shops list (no user-specific data) for 2 minutes
+    # Skip cache when search query is active
+    cache_key = f"shops:nearby:{round(lat,2)}:{round(lng,2)}:{category}"
+    if not q:
+        cached = await cache_get(cache_key)
+        if cached:
+            return {"shops": cached}
+
     filters: dict[str, Any] = {"status": "approved"}
     if category:
         filters["category"] = category
@@ -436,6 +538,9 @@ async def shops_nearby(
         s["distance_km"] = haversine_km(lat, lng, s["lat"], s["lng"])
     shops = [s for s in shops if s["distance_km"] <= radius_km]
     shops.sort(key=lambda x: x["distance_km"])
+
+    if not q:
+        await cache_set(cache_key, shops, ttl=120)
     return {"shops": shops}
 
 
@@ -465,7 +570,7 @@ async def create_shop(body: ShopIn, user: dict = Depends(require_role("shopkeepe
         "id": new_id(),
         "owner_id": user["id"],
         "owner_phone": user["phone"],
-        "status": "pending",
+        "status": "approved",
         "is_open": True,
         "rating": 4.5,
         "avg_pack_time_min": 15,
@@ -511,7 +616,12 @@ async def toggle_open(shop_id: str, user: dict = Depends(require_role("shopkeepe
 # --- Catalog routes -------------------------------------------------------
 @api.get("/shops/{shop_id}/catalog")
 async def shop_catalog(shop_id: str):
+    cache_key = f"catalog:{shop_id}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return {"items": cached}
     items = await db.catalog_items.find({"shop_id": shop_id}, {"_id": 0}).sort("category", 1).to_list(500)
+    await cache_set(cache_key, items, ttl=300)
     return {"items": items}
 
 
@@ -527,6 +637,7 @@ async def add_catalog_item(shop_id: str, body: CatalogItemIn, user: dict = Depen
         **body.model_dump(),
     }
     await db.catalog_items.insert_one(doc)
+    await cache_del(f"catalog:{shop_id}")
     return strip_id(doc)
 
 
@@ -541,6 +652,7 @@ async def update_catalog_item(item_id: str, body: CatalogUpdateIn, user: dict = 
     patch = {k: v for k, v in body.model_dump().items() if v is not None}
     if patch:
         await db.catalog_items.update_one({"id": item_id}, {"$set": patch})
+    await cache_del(f"catalog:{item['shop_id']}")
     fresh = await db.catalog_items.find_one({"id": item_id}, {"_id": 0})
     return fresh
 
@@ -554,6 +666,7 @@ async def delete_catalog_item(item_id: str, user: dict = Depends(require_role("s
     if not shop:
         raise HTTPException(403, "Forbidden")
     await db.catalog_items.delete_one({"id": item_id})
+    await cache_del(f"catalog:{item['shop_id']}")
     return {"ok": True}
 
 

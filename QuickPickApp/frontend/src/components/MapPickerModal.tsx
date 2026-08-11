@@ -1,6 +1,5 @@
-import React, { useRef, useState } from "react";
-import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import MapView, { Marker, MapPressEvent, Region } from "react-native-maps";
+import React, { useState } from "react";
+import { ActivityIndicator, Linking, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, font, radius, spacing } from "@/src/theme";
@@ -19,24 +18,7 @@ const DEFAULT: LatLng = { lat: 20.5937, lng: 78.9629 }; // India center
 export function MapPickerModal({ visible, initial, onConfirm, onClose }: Props) {
   const [pin, setPin] = useState<LatLng>(initial ?? DEFAULT);
   const [busy, setBusy] = useState(false);
-  const mapRef = useRef<MapView>(null);
-
-  const initialRegion: Region = {
-    latitude: pin.lat,
-    longitude: pin.lng,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  };
-
-  const onMapPress = (e: MapPressEvent) => {
-    const { latitude, longitude } = e.nativeEvent.coordinate;
-    setPin({ lat: latitude, lng: longitude });
-  };
-
-  const onDragEnd = (e: any) => {
-    const { latitude, longitude } = e.nativeEvent.coordinate;
-    setPin({ lat: latitude, lng: longitude });
-  };
+  const [gotLocation, setGotLocation] = useState(!!initial);
 
   const useMyLocation = async () => {
     setBusy(true);
@@ -44,9 +26,8 @@ export function MapPickerModal({ visible, initial, onConfirm, onClose }: Props) 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const next = { lat: loc.coords.latitude, lng: loc.coords.longitude };
-      setPin(next);
-      mapRef.current?.animateToRegion({ latitude: next.lat, longitude: next.lng, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 600);
+      setPin({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+      setGotLocation(true);
     } finally {
       setBusy(false);
     }
@@ -56,7 +37,8 @@ export function MapPickerModal({ visible, initial, onConfirm, onClose }: Props) 
     setBusy(true);
     try {
       const [geo] = await Location.reverseGeocodeAsync({ latitude: pin.lat, longitude: pin.lng });
-      const address = [geo?.street, geo?.district, geo?.city, geo?.region].filter(Boolean).join(", ") || `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`;
+      const address = [geo?.street, geo?.district, geo?.city, geo?.region].filter(Boolean).join(", ")
+        || `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`;
       onConfirm(pin, address);
     } catch {
       onConfirm(pin, `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`);
@@ -65,38 +47,66 @@ export function MapPickerModal({ visible, initial, onConfirm, onClose }: Props) 
     }
   };
 
+  const previewInMaps = () => {
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${pin.lat},${pin.lng}`);
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1 }}>
-        <MapView
-          ref={mapRef}
-          style={{ flex: 1 }}
-          initialRegion={initialRegion}
-          onPress={onMapPress}
-        >
-          <Marker
-            coordinate={{ latitude: pin.lat, longitude: pin.lng }}
-            draggable
-            onDragEnd={onDragEnd}
-            pinColor={colors.brand}
-          />
-        </MapView>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <View style={styles.sheet}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Set Shop Location</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <Ionicons name="close" size={20} color={colors.text} />
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={onClose} style={styles.iconBtn}>
-            <Ionicons name="close" size={22} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.topTitle}>Pick location</Text>
-          <TouchableOpacity onPress={useMyLocation} disabled={busy} style={styles.iconBtn}>
-            <Ionicons name="locate" size={22} color={colors.brand} />
-          </TouchableOpacity>
-        </View>
+          {/* Location display */}
+          <View style={styles.locationCard}>
+            <Ionicons name="location" size={40} color={gotLocation ? colors.brand : colors.textMuted} />
+            {gotLocation ? (
+              <>
+                <Text style={styles.coordText}>{pin.lat.toFixed(6)}</Text>
+                <Text style={styles.coordText}>{pin.lng.toFixed(6)}</Text>
+                <TouchableOpacity onPress={previewInMaps} style={styles.previewLink}>
+                  <Ionicons name="open-outline" size={14} color={colors.brand} />
+                  <Text style={styles.previewLinkText}>Preview in Google Maps</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text style={styles.noLocText}>No location set yet.{"\n"}Use the button below to get your current location.</Text>
+            )}
+          </View>
 
-        <View style={styles.bottom}>
-          <Text style={styles.coordText}>{pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}</Text>
-          <Text style={styles.hint}>Tap the map or drag the pin to set location</Text>
-          <TouchableOpacity onPress={confirm} disabled={busy} style={[styles.confirmBtn, busy && { opacity: 0.6 }]}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>Use this location</Text>}
+          {/* Use my location button */}
+          <TouchableOpacity
+            style={[styles.locBtn, busy && { opacity: 0.6 }]}
+            onPress={useMyLocation}
+            disabled={busy}
+            activeOpacity={0.85}
+          >
+            {busy
+              ? <ActivityIndicator color={colors.brand} />
+              : <Ionicons name="locate" size={20} color={colors.brand} />
+            }
+            <Text style={styles.locBtnText}>Use My Current Location</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.hint}>This will use your GPS location as the shop address.</Text>
+
+          {/* Confirm */}
+          <TouchableOpacity
+            style={[styles.confirmBtn, (!gotLocation || busy) && { opacity: 0.5 }]}
+            onPress={confirm}
+            disabled={!gotLocation || busy}
+            activeOpacity={0.85}
+          >
+            {busy
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.confirmText}>Use this location</Text>
+            }
           </TouchableOpacity>
         </View>
       </View>
@@ -105,33 +115,68 @@ export function MapPickerModal({ visible, initial, onConfirm, onClose }: Props) 
 }
 
 const styles = StyleSheet.create({
-  topBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.lg,
+    paddingBottom: 36,
+    gap: spacing.md,
+  },
+  header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    paddingTop: 52,
-    paddingBottom: spacing.md,
-    backgroundColor: "#FFFFFFEE",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
-  topTitle: { ...font.h3, color: colors.text },
-  iconBtn: { width: 40, height: 40, borderRadius: radius.pill, backgroundColor: colors.card, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border },
-  bottom: {
-    backgroundColor: "#FFFFFFEE",
+  title: { ...font.h2, color: colors.text },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  locationCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.lg,
-    paddingBottom: 36,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    gap: spacing.sm,
+    alignItems: "center",
+    gap: 6,
+    minHeight: 140,
+    justifyContent: "center",
   },
-  coordText: { ...font.small, color: colors.textMuted, fontFamily: "monospace" },
-  hint: { ...font.small, color: colors.textSubtle },
-  confirmBtn: { backgroundColor: colors.brand, height: 52, borderRadius: radius.pill, alignItems: "center", justifyContent: "center", marginTop: spacing.sm },
+  coordText: { ...font.body, color: colors.text, fontWeight: "700", fontFamily: "monospace" },
+  noLocText: { ...font.small, color: colors.textMuted, textAlign: "center", marginTop: 8 },
+  previewLink: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  previewLinkText: { ...font.small, color: colors.brand, fontWeight: "600" },
+  locBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    height: 52,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.brand,
+  },
+  locBtnText: { color: colors.brand, ...font.h3 },
+  hint: { ...font.small, color: colors.textMuted, textAlign: "center" },
+  confirmBtn: {
+    backgroundColor: colors.brand,
+    height: 52,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   confirmText: { color: "#fff", ...font.h3 },
 });
