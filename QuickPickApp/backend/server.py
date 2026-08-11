@@ -1176,6 +1176,57 @@ async def list_static_pages():
     return {"pages": pages}
 
 
+DEFAULT_HOMEPAGE = {
+    "hero": {
+        "badge": "Pre-order & Pickup Platform",
+        "title": "Skip the queue.",
+        "title_highlight": "Pick up what you need.",
+        "subtitle": "Pre-order from local shops. No waiting in line, no delivery fees, no surprises. Your order is ready when you arrive.",
+        "cta_primary": "How it works →",
+        "cta_secondary": "For Shopkeepers",
+    },
+    "stats": [
+        {"value": "0 min", "label": "Wait Time"},
+        {"value": "100%", "label": "Contactless"},
+        {"value": "₹0", "label": "Delivery Fee"},
+    ],
+    "features": [
+        {"icon": "📱", "title": "Order from your phone", "desc": "Browse nearby shops, add items, and place your order in seconds."},
+        {"icon": "✅", "title": "Shopkeeper confirms", "desc": "The shopkeeper reviews your items and sets the final price — no surprises."},
+        {"icon": "🔐", "title": "OTP pickup", "desc": "Get a unique OTP when your order is ready. Show it at the counter to collect instantly."},
+        {"icon": "💳", "title": "Flexible payment", "desc": "Pay online in full, or pay a 10% advance for COD orders."},
+        {"icon": "🗺️", "title": "Nearby shops", "desc": "Automatically shows shops near your location. Filter by category."},
+        {"icon": "📊", "title": "Real-time tracking", "desc": "Track your order from placed → packed → ready with live updates."},
+    ],
+    "contact": {
+        "title": "Ready to get started?",
+        "subtitle": "Download the app and start ordering, or register your shop today.",
+        "email": "hello@quickpick.in",
+    },
+}
+
+
+@api.get("/homepage")
+async def get_homepage():
+    doc = await db.homepage.find_one({"_id": "main"})
+    if not doc:
+        return DEFAULT_HOMEPAGE
+    doc.pop("_id", None)
+    return doc
+
+
+@api.put("/admin/homepage")
+async def update_homepage(body: dict, user: dict = Depends(require_role("admin"))):
+    await db.homepage.update_one(
+        {"_id": "main"},
+        {"$set": {**body, "updated_at": utcnow().isoformat()}},
+        upsert=True,
+    )
+    doc = await db.homepage.find_one({"_id": "main"})
+    doc.pop("_id", None)
+    return doc
+
+
 @api.get("/admin/analytics")
 async def admin_analytics(user: dict = Depends(require_role("admin"))):
     total_orders = await db.orders.count_documents({})

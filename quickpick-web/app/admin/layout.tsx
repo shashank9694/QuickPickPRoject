@@ -5,11 +5,12 @@ import { useEffect, useState } from "react";
 import { api, clearToken, User } from "@/lib/api";
 
 const NAV = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: "📊" },
-  { href: "/admin/shops", label: "Shops", icon: "🏪" },
-  { href: "/admin/users", label: "Users", icon: "👥" },
-  { href: "/admin/orders", label: "Orders", icon: "📦" },
-  { href: "/admin/subscriptions", label: "Subscriptions", icon: "💳" },
+  { href: "/admin/dashboard",    label: "Dashboard",    icon: "📊" },
+  { href: "/admin/shops",        label: "Shops",        icon: "🏪" },
+  { href: "/admin/users",        label: "Users",        icon: "👥" },
+  { href: "/admin/orders",       label: "Orders",       icon: "📦" },
+  { href: "/admin/subscriptions",label: "Subscriptions",icon: "💳" },
+  { href: "/admin/homepage",     label: "Homepage",     icon: "🌐" },
   { href: "/admin/static-pages", label: "Static Pages", icon: "📄" },
 ];
 
