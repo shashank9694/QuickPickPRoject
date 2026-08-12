@@ -15,7 +15,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#118A38"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.emergent.shoplocator.a9lw75"
@@ -31,7 +31,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-image.png",
-          "imageWidth": 400,
+          "imageWidth": 1242,
           "resizeMode": "cover",
           "backgroundColor": "#16A34A"
         }

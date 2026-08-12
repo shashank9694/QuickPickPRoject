@@ -1,18 +1,24 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api, saveToken, User } from "@/lib/api";
+import Link from "next/link";
+import { api, saveToken, hasToken, User } from "@/lib/api";
+import QuickPickLogo from "@/components/QuickPickLogo";
 
 type Step = "phone" | "otp";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
+  const [step, setStep]       = useState<Step>("phone");
+  const [phone, setPhone]     = useState("");
+  const [otp, setOtp]         = useState("");
   const [mockOtp, setMockOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const [err, setErr]         = useState("");
+
+  useEffect(() => {
+    if (hasToken()) router.replace("/admin/dashboard");
+  }, [router]);
 
   const sendOtp = async () => {
     setErr("");
@@ -45,72 +51,123 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="text-4xl mb-3">🛍️</div>
-          <h1 className="text-2xl font-extrabold text-slate-900">QuickPick Admin</h1>
-          <p className="text-slate-500 mt-1">Sign in to manage your platform</p>
-        </div>
+    <div className="admin-bg min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-          {step === "phone" ? (
-            <>
-              <h2 className="font-bold text-lg mb-1">Enter your phone</h2>
-              <p className="text-sm text-slate-500 mb-6">We'll send you a 6-digit verification code.</p>
-              <div className="flex gap-2 mb-4">
-                <div className="flex items-center justify-center w-14 h-12 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700">+91</div>
-                <input
-                  value={phone.replace(/^\+91/, "")}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                  onKeyDown={(e) => e.key === "Enter" && sendOtp()}
-                  type="tel"
-                  maxLength={10}
-                  placeholder="98765 43210"
-                  className="flex-1 h-12 px-4 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                />
+      {/* Background blobs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="blob blob-1 float-slow" />
+        <div className="blob blob-2 float-reverse" />
+        <div className="blob blob-3 float-med" />
+      </div>
+
+      {/* Decorative ring */}
+      <div className="absolute w-[600px] h-[600px] rounded-full border border-emerald-200/30 spin-slow pointer-events-none" />
+      <div className="absolute w-[400px] h-[400px] rounded-full border border-emerald-300/20 pointer-events-none" style={{ animation: "spin-slow 35s linear infinite reverse" }} />
+
+      <div className="relative z-10 w-full max-w-md anim-scale-in">
+        {/* Card */}
+        <div className="glass rounded-3xl shadow-2xl shadow-emerald-900/10 p-8 border border-white/60">
+
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <div className="relative">
+                <div className="absolute inset-0 bg-emerald-400/20 rounded-2xl blur-xl" />
+                <QuickPickLogo size={56} className="relative z-10" />
               </div>
-              {err && <p className="text-red-500 text-sm mb-4">{err}</p>}
-              <button
-                onClick={sendOtp}
-                disabled={loading}
-                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl transition-colors"
-              >
-                {loading ? "Sending…" : "Send OTP"}
-              </button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => { setStep("phone"); setErr(""); setOtp(""); }} className="text-slate-400 hover:text-slate-700 mb-4 text-sm">← Back</button>
-              <h2 className="font-bold text-lg mb-1">Enter verification code</h2>
-              <p className="text-sm text-slate-500 mb-4">Sent to {phone}</p>
-              {mockOtp && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
-                  <span className="text-emerald-600">ℹ️</span>
-                  <span className="text-sm text-emerald-800">Dev OTP: <strong className="tracking-widest">{mockOtp}</strong></span>
+            </div>
+            <h1 className="text-2xl font-extrabold text-slate-900">Admin Portal</h1>
+            <p className="text-slate-500 text-sm mt-1">Sign in to manage your platform</p>
+          </div>
+
+          {step === "phone" ? (
+            <div className="anim-fade-in">
+              <div className="mb-2">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">Phone Number</label>
+                <div className="flex gap-2">
+                  <div className="flex items-center justify-center w-14 h-12 bg-white/70 backdrop-blur border border-white/60 rounded-xl font-bold text-slate-700 text-sm flex-shrink-0">
+                    🇮🇳 +91
+                  </div>
+                  <input
+                    value={phone.replace(/^\+91/, "")}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                    onKeyDown={(e) => e.key === "Enter" && sendOtp()}
+                    type="tel" maxLength={10} placeholder="98765 43210"
+                    className="glass-input flex-1 h-12 text-base"
+                  />
+                </div>
+              </div>
+
+              {err && (
+                <div className="mt-3 mb-4 p-3 rounded-xl bg-red-50/80 backdrop-blur border border-red-200 text-red-600 text-sm anim-fade-in">
+                  {err}
                 </div>
               )}
+
+              <button onClick={sendOtp} disabled={loading}
+                className="btn-primary w-full justify-center h-12 text-base mt-4 rounded-xl disabled:opacity-60">
+                {loading
+                  ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending…</>
+                  : "Send OTP →"
+                }
+              </button>
+            </div>
+          ) : (
+            <div className="anim-fade-in">
+              <button onClick={() => { setStep("phone"); setErr(""); setOtp(""); }}
+                className="flex items-center gap-1 text-sm text-slate-400 hover:text-slate-700 transition-colors mb-5">
+                ← Back
+              </button>
+
+              <div className="mb-2">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 block">Verification Code</label>
+                <p className="text-sm text-slate-500 mb-4">Sent to <span className="font-semibold text-slate-700">{phone}</span></p>
+              </div>
+
+              {mockOtp && (
+                <div className="bg-emerald-50/80 backdrop-blur border border-emerald-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2 anim-fade-in">
+                  <span className="text-emerald-500">ℹ️</span>
+                  <span className="text-sm text-emerald-800">Dev OTP: <strong className="tracking-[0.3em] font-extrabold">{mockOtp}</strong></span>
+                </div>
+              )}
+
               <input
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                 onKeyDown={(e) => e.key === "Enter" && verifyOtp()}
-                type="tel"
-                maxLength={6}
-                placeholder="• • • • • •"
-                className="w-full h-16 px-4 border border-slate-200 rounded-xl text-center text-3xl font-extrabold tracking-[0.5em] text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 mb-4"
+                type="tel" maxLength={6} placeholder="• • • • • •"
+                className="glass-input w-full h-16 text-center text-3xl font-extrabold tracking-[0.5em] mb-2"
               />
-              {err && <p className="text-red-500 text-sm mb-4">{err}</p>}
-              <button
-                onClick={verifyOtp}
-                disabled={loading || otp.length < 6}
-                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl transition-colors"
-              >
-                {loading ? "Verifying…" : "Verify & Continue"}
+
+              {err && (
+                <div className="mt-2 mb-4 p-3 rounded-xl bg-red-50/80 backdrop-blur border border-red-200 text-red-600 text-sm anim-fade-in">
+                  {err}
+                </div>
+              )}
+
+              <button onClick={verifyOtp} disabled={loading || otp.length < 6}
+                className="btn-primary w-full justify-center h-12 text-base mt-2 rounded-xl disabled:opacity-60">
+                {loading
+                  ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Verifying…</>
+                  : "Verify & Enter →"
+                }
               </button>
-            </>
+            </div>
           )}
+
+          {/* Step dots */}
+          <div className="flex justify-center gap-2 mt-6">
+            {["phone", "otp"].map((s) => (
+              <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${step === s ? "w-6 bg-emerald-500" : "w-1.5 bg-slate-200"}`} />
+            ))}
+          </div>
         </div>
-        <p className="text-center text-xs text-slate-400 mt-6">Admin access only. Seed phone: +919999999999</p>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between mt-4 px-1">
+          <Link href="/" className="text-xs text-slate-500 hover:text-emerald-600 transition-colors">← Back to home</Link>
+          <p className="text-xs text-slate-400">Admin only · seed: +919999999999</p>
+        </div>
       </div>
     </div>
   );

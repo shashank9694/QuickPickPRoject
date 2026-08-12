@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, TextInput, ScrollView, Image } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, TextInput, ScrollView, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
@@ -9,8 +9,20 @@ import { api, Shop } from "@/src/api";
 import { useAuth } from "@/src/auth";
 
 const CATEGORIES = ["All", "Grocery", "Bakery", "Pharmacy", "Cafe"];
-// Default: Bengaluru MG Road (used when GPS unavailable / denied)
 const DEFAULT_COORDS = { lat: 12.9716, lng: 77.5946 };
+
+function SkeletonCard() {
+  return (
+    <View style={styles.card}>
+      <View style={styles.skeletonImg} />
+      <View style={{ padding: spacing.lg, gap: spacing.sm }}>
+        <View style={[styles.skeletonLine, { width: "60%" }]} />
+        <View style={[styles.skeletonLine, { width: "40%", height: 12 }]} />
+        <View style={[styles.skeletonLine, { width: "80%", height: 12, marginTop: 4 }]} />
+      </View>
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -21,7 +33,14 @@ export default function HomeScreen() {
   const [coords, setCoords] = useState(DEFAULT_COORDS);
   const [coordsLabel, setCoordsLabel] = useState("Using default location");
   const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [cat, setCat] = useState("All");
+
+  // Debounce search input — wait 300ms after user stops typing
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 300);
+    return () => clearTimeout(t);
+  }, [q]);
 
   const fetchLocation = useCallback(async () => {
     try {
@@ -33,7 +52,6 @@ export default function HomeScreen() {
       }
       if (s === "granted") {
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
         setCoordsLabel("Near your location");
         return { lat: loc.coords.latitude, lng: loc.coords.longitude };
       }
@@ -44,35 +62,50 @@ export default function HomeScreen() {
     return DEFAULT_COORDS;
   }, []);
 
-  const loadShops = useCallback(async (c: { lat: number; lng: number }) => {
+  // Stable fetch function — no closure deps, all params explicit
+  const loadShops = useCallback(async (
+    c: { lat: number; lng: number },
+    query: string,
+    category: string,
+  ) => {
     try {
       const { data } = await api.get<{ shops: Shop[] }>("/shops/nearby", {
-        params: { lat: c.lat, lng: c.lng, q, category: cat === "All" ? "" : cat },
+        params: { lat: c.lat, lng: c.lng, q: query, category: category === "All" ? "" : category },
       });
       setShops(data.shops);
-    } catch (e) {
+    } catch {
       setShops([]);
     }
-  }, [q, cat]);
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const c = await fetchLocation();
-      await loadShops(c);
-      setLoading(false);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Track whether the initial fetch has already been fired
+  const didInitRef = useRef(false);
+
+  // Single effect drives all fetches.
+  // On mount (didInitRef.current = false): fetch immediately with default coords,
+  // get GPS in parallel — no 3-7s wait. Subsequent fires reload with current params.
   useEffect(() => {
-    loadShops(coords);
-  }, [q, cat, coords, loadShops]);
+    if (!didInitRef.current) {
+      didInitRef.current = true;
+      setLoading(true);
+      loadShops(DEFAULT_COORDS, debouncedQ, cat).finally(() => setLoading(false));
+      // GPS in background — updates coords if better location available
+      fetchLocation().then((gpsCoords) => {
+        if (gpsCoords.lat !== DEFAULT_COORDS.lat || gpsCoords.lng !== DEFAULT_COORDS.lng) {
+          setCoords(gpsCoords); // triggers this effect again for a precision refresh
+        }
+      });
+    } else {
+      loadShops(coords, debouncedQ, cat);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQ, cat, coords]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     const c = await fetchLocation();
-    await loadShops(c);
+    setCoords(c);
+    await loadShops(c, q, cat);
     setRefreshing(false);
   };
 
@@ -123,7 +156,17 @@ export default function HomeScreen() {
       </ScrollView>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={colors.brand} /></View>
+        <ScrollView
+          contentContainerStyle={{ padding: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xxl }}
+          scrollEnabled={false}
+        >
+          {[1, 2, 3].map((k) => (
+            <View key={k}>
+              <SkeletonCard />
+              {k < 3 && <View style={{ height: spacing.md }} />}
+            </View>
+          ))}
+        </ScrollView>
       ) : (
         <FlatList
           data={shops}
@@ -145,7 +188,11 @@ export default function HomeScreen() {
               style={styles.card}
               onPress={() => router.push({ pathname: "/(customer)/shop/[id]", params: { id: item.id } })}
             >
-              <Image source={{ uri: item.photo_url }} style={styles.cardImg} />
+              {item.photo_url ? (
+                <Image source={{ uri: item.photo_url }} style={styles.cardImg} />
+              ) : (
+                <View style={styles.cardImg} />
+              )}
               <View style={styles.cardBody}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
@@ -192,7 +239,8 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   chipText: { ...font.small, color: colors.text },
   chipTextActive: { color: "#fff", fontWeight: "700" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  skeletonImg: { width: "100%", height: 150, backgroundColor: "#E2E8F0" },
+  skeletonLine: { height: 16, backgroundColor: "#E2E8F0", borderRadius: radius.sm },
   card: { backgroundColor: colors.card, borderRadius: radius.xl, overflow: "hidden", borderWidth: 1, borderColor: colors.border },
   cardImg: { width: "100%", height: 150, backgroundColor: "#E2E8F0" },
   cardBody: { padding: spacing.lg, gap: 4 },

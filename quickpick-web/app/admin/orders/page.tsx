@@ -28,7 +28,7 @@ export default function OrdersPage() {
   const load = async (status?: string) => {
     setLoading(true);
     try {
-      const params = status && status !== "all" ? { status } : {};
+      const params: Record<string, string> = status && status !== "all" ? { status } : {};
       const d = await api.get<{ orders: Order[] }>("/admin/orders", params);
       setOrders(d.orders);
     } finally { setLoading(false); }

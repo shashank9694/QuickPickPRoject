@@ -5,16 +5,24 @@ const BASE = process.env.EXPO_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
 export const AUTH_TOKEN_KEY = "quickpick_token";
 
+// In-memory token cache so SecureStore (disk I/O) is only read once per session.
+// undefined = not yet loaded; "" = loaded but no token; string = valid token.
+let _tokenCache: string | undefined = undefined;
+export function setTokenCache(t: string) { _tokenCache = t; }
+export function clearTokenCache() { _tokenCache = undefined; }
+
 export const api = axios.create({
   baseURL: `${BASE}/api`,
-  timeout: 15000,
+  timeout: 8000,
 });
 
 api.interceptors.request.use(async (config) => {
-  const token = await storage.secureGet<string>(AUTH_TOKEN_KEY, "");
-  if (token) {
+  if (_tokenCache === undefined) {
+    _tokenCache = (await storage.secureGet<string>(AUTH_TOKEN_KEY, "")) ?? "";
+  }
+  if (_tokenCache) {
     config.headers = config.headers ?? {};
-    (config.headers as any).Authorization = `Bearer ${token}`;
+    (config.headers as any).Authorization = `Bearer ${_tokenCache}`;
   }
   return config;
 });

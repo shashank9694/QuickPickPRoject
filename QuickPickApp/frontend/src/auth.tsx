@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { api, AUTH_TOKEN_KEY, User } from "@/src/api";
+import { api, AUTH_TOKEN_KEY, User, setTokenCache, clearTokenCache } from "@/src/api";
 import { storage } from "@/src/utils/storage";
 
 type AuthState = {
@@ -21,6 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const timer = setTimeout(() => setLoading(false), 4000);
     try {
       const token = (await storage.secureGet<string>(AUTH_TOKEN_KEY, "")) ?? "";
+      setTokenCache(token); // warm the in-memory cache for the interceptor
 
       if (!token) { setUser(null); return; }
 
@@ -41,11 +42,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (token: string, u: User) => {
     await storage.secureSet(AUTH_TOKEN_KEY, token);
+    setTokenCache(token);
     setUser(u);
   };
 
   const signOut = async () => {
     await storage.secureRemove(AUTH_TOKEN_KEY);
+    clearTokenCache();
     setUser(null);
   };
 
