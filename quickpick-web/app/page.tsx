@@ -28,12 +28,15 @@ const DEFAULT_HP: HP = {
     { value: "₹0", label: "Delivery Fee" },
   ],
   features: [
-    { icon: "📱", title: "Order from your phone", desc: "Browse nearby shops, add items, and place your order in seconds." },
-    { icon: "✅", title: "Shopkeeper confirms", desc: "The shopkeeper reviews items and sets final price — no surprises." },
-    { icon: "🔐", title: "OTP pickup", desc: "Get a unique OTP when your order is ready. Show it at the counter." },
-    { icon: "💳", title: "Flexible payment", desc: "Pay online in full, or pay a 10% advance for COD orders." },
-    { icon: "🗺️", title: "Nearby shops", desc: "Automatically shows shops near your location. Filter by category." },
-    { icon: "📊", title: "Real-time tracking", desc: "Track your order from placed → packed → ready without refreshing." },
+    { icon: "🎙️", title: "Voice your order", desc: "Speak your shopping list in Hindi or Hinglish — AI understands, transcribes, and adds every item to your cart instantly." },
+    { icon: "📷", title: "Photo your list", desc: "Snap a photo of your handwritten shopping list. AI reads it and creates your order automatically, even in Hindi." },
+    { icon: "🗺️", title: "Nearby shops", desc: "Automatically shows shops near your location. Browse by category and see what's open right now." },
+    { icon: "🔐", title: "OTP pickup", desc: "Get a unique OTP when your order is ready. Show it at the counter — no cash, no confusion." },
+    { icon: "💳", title: "Flexible payment", desc: "Pay online in full, or pay a 10% advance for COD orders. Your choice, every time." },
+    { icon: "📊", title: "Real-time tracking", desc: "Track your order from placed → packed → ready in real time. No need to call the shop." },
+    { icon: "🎤", title: "Voice your catalog", desc: "Shopkeepers: just speak your price list in Hindi. AI extracts every item name, price, unit and category for you." },
+    { icon: "🖼️", title: "Photo your price board", desc: "Photograph your handwritten menu or price board. AI reads every product and builds your shop catalog in seconds." },
+    { icon: "✅", title: "Shopkeeper control", desc: "Review each order, adjust unavailable items, set the final price, and mark ready — all from one screen." },
   ],
   contact: { title: "Ready to get started?", subtitle: "Download the app and start ordering, or register your shop today.", email: "hello@quickpick.in" },
 };
@@ -185,8 +188,8 @@ export default function LandingPage() {
       <section id="features" className="relative z-10 max-w-6xl mx-auto px-4 py-20">
         <div className="text-center mb-14">
           <div className="inline-block text-emerald-600 font-bold text-xs uppercase tracking-widest mb-3 bg-emerald-50 border border-emerald-200 px-4 py-1.5 rounded-full">Features</div>
-          <h2 className="text-4xl font-extrabold mb-4">Everything you need</h2>
-          <p className="text-slate-500 max-w-xl mx-auto">Built for speed, simplicity, and reliability at scale.</p>
+          <h2 className="text-4xl font-extrabold mb-4">Everything you need — now with AI</h2>
+          <p className="text-slate-500 max-w-xl mx-auto">Voice and photo ordering for customers. Voice and photo catalog setup for shopkeepers. Built in, no extra steps.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-5">
           {hp.features.map((f, i) => (
